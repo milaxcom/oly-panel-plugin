@@ -1,0 +1,18 @@
+box: misterpaladin/webstack
+ 
+build:
+  steps:
+    - script:
+      code: echo 0
+
+deploy:
+  steps:
+    - add-to-known_hosts:
+      hostname: $HOST
+      port: $PORT
+    - add-ssh-key:
+      keyname: DEPLOY_KEY
+      host: $HOST
+    - script:
+      name: setup chown+chmod & migrate
+      code: tar czf - * | ssh -l $USER $HOST -p $PORT "cd $PROJECT_PATH; sudo tar xvzf -"
