@@ -272,7 +272,7 @@
                         _this.setLS('ifNegative', _this.ifNegative)
                         _this.setLS('currentAmount', _this.currentAmount)
                         _this.setLS('autoStart', true)
-                        // window.location.reload()
+                        window.location.reload()
                     },
                 })
 
@@ -389,7 +389,7 @@
 
         $.ajax({
             url : 'http://185.61.78.52:8081/',
-            dataType : 'json',
+            dataType : 'jsonp',
             type : 'get',
             data : data,
         });
