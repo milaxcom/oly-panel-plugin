@@ -1,0 +1,26 @@
+{
+  "name": "oly-panel-plugin",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://gusakovm@github.com/milaxcom/oly-panel-plugin.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/milaxcom/oly-panel-plugin/issues"
+  },
+  "homepage": "https://github.com/milaxcom/oly-panel-plugin#readme",
+  "dependencies": {
+    "dotenv": "^5.0.1",
+    "http": "^0.0.0",
+    "mysql2": "^1.5.3",
+    "sequelize": "^4.37.5",
+    "url": "^0.11.0"
+  }
+}

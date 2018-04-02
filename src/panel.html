@@ -1,0 +1,475 @@
+<div class="olyPanel">
+    <input name="olyPanelDefaultRate" class="olyPanel__input" placeholder="Default rate, RUB" value="30" />
+    <input name="olyPanelProfit" class="olyPanel__input" placeholder="Profit" value="80" />
+    <input name="olyPanelMinutes" class="olyPanel__input" placeholder="Minutes" value="1" />
+    
+    <button class="olyPanel__button olyPanel__button_start olyPanel__button_enabled">Start</button>
+    <button class="olyPanel__button olyPanel__button_stop">Stop</button>
+</div>
+
+<style>
+    .olyPanel {
+        display: none;
+        position: fixed;
+        bottom: 0;
+        left:0;
+        height: 60px;
+        width: 100%;
+        background-color: #fff;
+        border-top: 1px solid #D7D7D7;
+        box-sizing: border-box;
+        padding: 11px 10px;
+        z-index: 9999999999;
+    }
+    .olyPanel_show {
+        display: block;
+    }
+    .olyPanel * {
+        font-family:'Open Sans' !important;
+        font-size: 14px !important;
+        color: #222;
+    }
+    .olyPanel__input {
+        border-radius: 2px;
+        background-color: #fff;
+        border: 1px solid #D7D7D7;
+        height: 38px;
+        width: 140px;
+        box-sizing: border-box;
+        padding-left: 8px;
+        outline: none;
+        display: inline-block;
+        margin-right: 6px;
+    }
+    .olyPanel__input::placeholder {
+        color: #AEAEAE;
+    }
+    .olyPanel__button {
+        position: absolute;
+        right: 8px;
+        top: 11px;
+        border: none;
+        height: 38px;
+        background-color: none;
+        box-sizing: border-box;
+        padding: 0 8px;
+        display: none;
+        outline: none;
+        cursor: pointer;
+    }
+    .olyPanel__button_enabled {
+        display: block;
+    }
+    .olyPanel__button_start {
+        color: #32a66e;
+    }
+    .olyPanel__button_stop {
+        color: #dd5540;
+    }
+</style>
+
+
+<script>
+    
+    var olyPlugin = function() {
+        console.log('Run plugin Oly Panel for Chrome')
+
+        this.olyPanel = $('.olyPanel');
+        this.buttonStart = $('.olyPanel__button_start');
+        this.buttonStop = $('.olyPanel__button_stop');
+        this.inputRate = $('input[name=olyPanelDefaultRate]');
+        this.inputProfit = $('input[name=olyPanelProfit]');
+        this.inputMinutes = $('input[name=olyPanelMinutes]');
+        
+        this.circle = false;
+        this.predictions = {};
+        this.tabs = {};
+
+        this.initLS();
+
+        this.lastOrderProfit = (this.existLS('lastOrderProfit')) ? this.getLS('lastOrderProfit') : -1;
+        this.ifNegative = (this.existLS('ifNegative')) ? this.getLS('ifNegative') : 0;
+        this.currentAmount = (this.existLS('currentAmount')) ? this.getLS('currentAmount') : 0;
+        this.autoStart = (this.existLS('autoStart')) ? this.getLS('autoStart') : false;
+
+        this.init();
+
+        this.fetchSignals();
+        
+    };
+
+    olyPlugin.prototype.fetchSignals = function () {
+
+        var _this = this;
+
+        $.ajax({
+            type: 'post',
+            dataType: 'html',
+            url: 'https://ssltsw.forexprostools.com/index.php?timeframe=60',
+            success: function (data) {
+
+                var element = $('<div></div>').html(data);
+                var tableRows = element.find('.genTable.openTable.quotesSideBlockTable.collapsedTable tr');
+                
+                tableRows.each(function (index) {
+                    if (index < 7) {
+                        var pair = $(this).find('td:eq(2)').text();
+                        pair = pair.replace(/[\/]/gi, '')
+                        var predict = $(this).find('td:eq(4)').text();
+                        _this.predictions[pair] = predict;
+                    }
+                });
+
+                setTimeout(function () { _this.fetchSignals() }, 25000);
+            },
+            error: function () {
+                setTimeout(function () { _this.fetchSignals() }, 25000);
+            }
+        });
+
+    };
+
+    olyPlugin.prototype.init = function () {
+        this.buttonStart.on('click', this.start.bind(this))
+        this.buttonStop.on('click', this.stop.bind(this))
+
+        this.waitingGUITimeout = setInterval(this.waitingGUI.bind(this), 100)
+    };
+
+    olyPlugin.prototype.fetchTabs = function () {
+        
+        var tabs = $('.pair-tabs__sidebar .container .tabs li');
+        var _this = this;
+
+        _this.tabs = {};
+
+        tabs.each(function () {
+            var pair = $(this).attr('id').substr(6);
+            var active = ($(this).hasClass('pair-tab_disabled')) ? false : true;
+            var profit = $(this).find('.percent').text().substr(0,2);
+            var prediction = (typeof _this.predictions[pair] !== 'undefined') ? _this.predictions[pair] : '';
+            
+            if (prediction.length>0 && prediction.indexOf('Buy')>=0) var side = 'up';
+            else if (prediction.length>0 && prediction.indexOf('Sell')>=0) var side = 'down';
+            else var side = 'none';
+            
+            _this.tabs[pair] = {
+                $ : $(this),
+                pair : pair,
+                active : active,
+                profit : parseInt(profit),
+                prediction : prediction,
+                side : side,
+            };
+        });
+
+        return this.tabs;
+
+    };
+    
+    olyPlugin.prototype.checkGUIisAvailable = function () {
+
+        if (this.formButtonUp.length && this.formButtonDown.length && this.formInputMinutes.length && this.formInputAmount.length)
+            return true;
+        else
+            return false;
+    };
+
+    olyPlugin.prototype.waitingGUI = function () {
+
+        this.formButtonUp = $('#deal_controls > div > div.deal-form > div.state-block.js_tu_deal_buttons.deal-form__item.deal-form__risk-free > div > div > div.container.-up > button:visible');
+        this.formButtonDown = $('#deal_controls > div > div.deal-form > div.state-block.js_tu_deal_buttons.deal-form__item.deal-form__risk-free > div > div > div.container.-down > button:visible');
+        this.formInputMinutes = $('span.timeinput__label.timeinput__label_minutes > input:visible');
+        this.formInputAmount = $('div.input-currency > input:visible');
+
+        if (this.checkGUIisAvailable()) {
+            console.log('Ready to use');
+            clearInterval(this.waitingGUITimeout);
+            this.olyPanel.addClass('olyPanel_show');
+            if (this.autoStart) {
+                console.log('Auto Start Plugin');
+                this.start();
+            }
+        }
+
+    }
+
+    olyPlugin.prototype.vals = function () {
+        
+        return {
+            defaultRate : parseInt(this.inputRate.val()),
+            profit : parseInt(this.inputProfit.val()),
+            minutes : parseInt(this.inputMinutes.val()),
+        }
+
+    };
+
+    olyPlugin.prototype.start = function () {
+        if (this.checkGUIisAvailable()) {
+            
+            this.controlTaggle()
+            this.openOrder()
+
+        } else
+            console.log('Trading GUI is unavailable')
+    };
+
+    olyPlugin.prototype.controlTaggle = function () {
+        this.buttonStart.toggleClass('olyPanel__button_enabled')
+        this.buttonStop.toggleClass('olyPanel__button_enabled')
+    };
+
+    olyPlugin.prototype.stop = function () {
+        this.controlTaggle()
+
+        clearInterval(this.lookingForTheNewDeal)
+        clearInterval(this.lookingForTheHistoryDeal)
+
+        this.circle = false
+    };
+
+    olyPlugin.prototype.openOrder = function () {
+
+        this.circle = false
+
+        if (this.autoStart) {
+            // It means we already reloaded the page
+            
+            this.removeLS('lastOrderProfit')
+            this.removeLS('ifNegative')
+            this.removeLS('currentAmount')
+            this.removeLS('autoStart')
+            this.autoStart = false;
+            
+        } else {
+            
+            if (this.lastOrderProfit === -1 || this.lastOrderProfit > 0) {
+                if (parseInt(this.currentAmount) === parseInt(this.lastOrderProfit)) {
+                    // Standoff
+                    var sku = this.sku(this.currentAmount, this.vals().profit)
+                } else {
+                    var sku = this.sku(this.vals().defaultRate, this.vals().profit)
+                    this.currentAmount = this.vals().defaultRate;
+                }
+            } else {
+                var sku = this.sku(this.ifNegative, this.vals().profit)
+                this.currentAmount = this.ifNegative;
+            }
+            
+            this.ifNegative = Math.floor( parseInt(sku[1].orderPositive) );
+            
+            if (parseInt(this.formInputAmount.val()) !== this.currentAmount) {
+                // It means we have to reload the page
+
+                _this = this
+
+                $.ajax({
+                    url: 'https://olymptrade.com/user/set-option?name=deal_sum&value=%7B%22demo%22%3A' + this.currentAmount + '%2C%22real%22%3A' + this.currentAmount + '%7D',
+                    type: 'post',
+                    success: function () {
+                        console.log('Reload page');
+                        _this.setLS('lastOrderProfit', _this.lastOrderProfit)
+                        _this.setLS('ifNegative', _this.ifNegative)
+                        _this.setLS('currentAmount', _this.currentAmount)
+                        _this.setLS('autoStart', true)
+                        window.location.reload()
+                    },
+                })
+
+                return false;
+            }
+
+        }
+
+        var openStep = function () {
+                        
+            console.log('Open order', {
+                pair: this.pair,
+                pairProfit: this.profit,
+                prediction: this.prediction,
+                side: this.side,
+                amount: this.currentAmount,
+                minutes: this.vals().minutes
+            });
+            
+            this.formInputMinutes.val(this.vals().minutes);
+            this.formInputAmount.val(this.currentAmount);
+            this.clickButtons(this.side);
+            this.parseNewOrder();
+            
+            this.circle = true
+        };
+        
+        var preditctionStep = function () {
+
+            this.fetchTabs();
+
+            console.log(this.tabs);
+
+            for (var key in this.tabs) {
+                if (this.tabs[key].active && this.tabs[key].prediction.substr(0, 6) == 'Strong' && this.tabs[key].profit >= 80) {
+                    this.profit = this.tabs[key].profit;
+                    this.pair = this.tabs[key].pair;
+                    this.prediction = this.tabs[key].prediction;
+                    this.side = this.tabs[key].side;
+                    this.openTabAndWait(this.tabs[key].$, openStep);
+                    return true;
+                }
+            }
+
+            setTimeout(preditctionStep.bind(this), 5000);
+
+        };
+
+        preditctionStep.call(this);
+
+    };
+
+    olyPlugin.prototype.openTabAndWait = function (element, callback) {
+
+        element.click();
+
+        setTimeout(callback.bind(this), 1000);
+
+    };
+
+    olyPlugin.prototype.parseNewOrder = function () {
+
+        var _this = this;
+
+        this.lookingForTheNewDeal = setInterval(function () {
+            
+            var table = $('.time-deals .user-deals-table tbody');
+            var deal = $('.user-deals-table__row', table);
+
+            if (deal.length) {
+                var id = deal.data('test').substr(12);
+                clearInterval(_this.lookingForTheNewDeal);
+                _this.parseHistoryToFindId(id);
+            }
+
+        }, 1000)
+
+    };
+
+    olyPlugin.prototype.parseHistoryToFindId = function (id) {
+
+        var _this = this;
+
+        this.lookingForTheHistoryDeal = setInterval(function () {
+            
+            var table = $('.user-deals-table.user-deals-table_history tbody');
+            var deal = $('.user-deals-table__row:eq(0)', table);
+
+            if (deal.length && deal.data('test').substr(12) === id ) {
+                clearInterval(_this.lookingForTheHistoryDeal);
+                var profitTag = $('td.user-deals-table__cell.user-deals-table__cell_profit > span > span');
+                _this.lastOrderProfit = Math.floor( parseInt(profitTag.text().replace(/[\ ]/gi, '')) );
+                _this.printToDB();
+                _this.openOrder()
+            }
+
+        }, 1000)
+
+    };
+
+    olyPlugin.prototype.printToDB = function () {
+
+        var data = {
+            pair : this.pair,
+            pairProfit : this.profit,
+            prediction : this.prediction,
+            side : this.side,
+            amount : this.currentAmount,
+        };
+
+        if (this.lastOrderProfit == 0) data.profit = this.currentAmount * (-1);
+        else if (this.lastOrderProfit > this.currentAmount*1) data.profit = this.lastOrderProfit - this.currentAmount*1;
+        else data.profit = 0;
+
+        $.ajax({
+            url : 'http://127.0.0.1:8081/',
+            dataType : 'json',
+            type : 'get',
+            data : data,
+        });
+
+    };
+    
+    olyPlugin.prototype.clickButtons = function (side) {
+        setTimeout(function () {
+            if (side === 'up')
+                $('.-up > button').click();
+            else
+                $('.-down > button').click();
+        }, 10)
+    };
+
+    
+    olyPlugin.prototype.determineSide = function () {
+        if (Math.round(Math.random()) === 0)
+            return 'up';
+        else
+            return 'down';
+    };
+
+    olyPlugin.prototype.sku = function (sum, profit, type = 1) {
+        // type
+        // 1 - Base
+        // 2 - Moderate
+        // 3 - Progressive
+
+        var n = 0,
+            s = 0,
+            l = 0,
+            r = 0,
+            data = [];
+        
+        for (var c = 1; c < 9; c++) {
+            if (1 === type || 2 === type) {
+                var d = 2.5;
+                if (2 === type && (d = 2.25), s = sum, c > 1)
+                    for (var u = 1; u < c; u++) s *= d
+            } else if (3 === type)
+                for (var v = 1; v < c + 1; v++) 1 === v ? s += sum : 2 === v ? s *= 2.5 : s += 2.5 * s;
+            n += s, l = s * (1 + profit), r = l - n;
+            data.push({
+                orderAmount: c, 
+                orderPositive: s, 
+                orderProfit: l, 
+                deposit: r,
+                odds: n
+            });
+            s = 0;
+        }
+
+        return data;
+    };
+
+    olyPlugin.prototype.initLS = function () {
+        
+        this.lS = window.localStorage;
+
+        this.getLS = function (name) {
+            return this.lS.getItem(name)
+        }
+
+        this.setLS = function (name, value) {
+            this.lS.setItem(name, value)
+        }
+
+        this.existLS = function (name) {
+            if (this.lS[name]) return true;
+            else return false;
+        }
+
+        this.removeLS = function (name) {
+            this.lS.removeItem(name)
+        }
+
+    };
+
+    // Load Jq
+    function loadJq(){!function(e,n){var t=document;if(!t.getElementById(n)){var c=t.createElement("script");c.src=e,c.id=n,t.body.appendChild(c)}}("//code.jquery.com/jquery-3.3.1.min.js","jquery")}loadJq(),window.checkJqInterval=setInterval(function(){"undefined"!=typeof $&&(clearInterval(window.checkJqInterval),new olyPlugin())},1);
+
+</script>
