@@ -1,4 +1,4 @@
-box: misterpaladin/webstack
+box: node
  
 build:
   steps:
