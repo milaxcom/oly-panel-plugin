@@ -88,28 +88,40 @@
         console.log('Run plugin Oly Panel for Chrome')
 
         this.olyPanel = $('.olyPanel');
-        this.buttonStart = $('.olyPanel__button_start');
-        this.buttonStop = $('.olyPanel__button_stop');
         this.inputRate = $('input[name=olyPanelDefaultRate]');
-        this.inputProfit = $('input[name=olyPanelProfit]');
-        this.inputMinutes = $('input[name=olyPanelMinutes]');
+
+        this.profitPercent = 90;
         
         this.circle = false;
         this.predictions = {};
         this.tabs = {};
 
-        this.initLS();
+        // this.initLS();
 
-        this.lastOrderProfit = (this.existLS('lastOrderProfit')) ? this.getLS('lastOrderProfit') : -1;
-        this.ifNegative = (this.existLS('ifNegative')) ? this.getLS('ifNegative') : 0;
-        this.currentAmount = (this.existLS('currentAmount')) ? this.getLS('currentAmount') : 0;
-        this.autoStart = (this.existLS('autoStart')) ? this.getLS('autoStart') : false;
+        // this.lastOrderProfit = (this.existLS('lastOrderProfit')) ? this.getLS('lastOrderProfit') : -1;
+        // this.ifNegative = (this.existLS('ifNegative')) ? this.getLS('ifNegative') : 0;
+        // this.currentAmount = (this.existLS('currentAmount')) ? this.getLS('currentAmount') : 0;
+        // this.autoStart = (this.existLS('autoStart')) ? this.getLS('autoStart') : false;
 
-        this.init();
+        // this.init();
 
-        this.fetchSignals();
+        // this.fetchSignals();
+
+        this.fetchCurrentPercent();
         
     };
+
+    olyPlugin.prototype.fetchCurrentPercent = function () {
+
+        setTimeInterval(function () {
+
+            var currentTab = $('.pair-tabs__sidebar .container .tabs .pair-tab_selected');
+            var currentPercent = currentTab.find('.percent').text()
+            console.log(currentPercent)
+
+        }, 800)
+        
+    }
 
     olyPlugin.prototype.fetchSignals = function () {
 
