@@ -117,6 +117,7 @@
 
             var currentTab = $('.pair-tabs__sidebar .container .tabs .pair-tab_selected');
             var currentPercent = currentTab.find('.percent').text()
+            var currentPercent = currentPercent.replace(/[%]/gi, '')
             console.log(currentPercent)
 
         }, 800)
