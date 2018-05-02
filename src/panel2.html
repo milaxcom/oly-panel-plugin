@@ -113,7 +113,7 @@
 
     olyPlugin.prototype.fetchCurrentPercent = function () {
 
-        setTimeInterval(function () {
+        setInterval(function () {
 
             var currentTab = $('.pair-tabs__sidebar .container .tabs .pair-tab_selected');
             var currentPercent = currentTab.find('.percent').text()
